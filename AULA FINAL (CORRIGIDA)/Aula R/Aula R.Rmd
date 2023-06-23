@@ -1,0 +1,266 @@
+---
+title: "Aula de Regressão Logística Simples no R"
+author: "Arthur Lerner"
+date: "2023-06-22"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+Este primeiro exemplo tratará da regressão logística simples, 
+portanto, utilizando somente uma variável independente, 
+neste caso numérica.
+
+Trata-se de uma amostra com 100 pessoas. A variável dependente 
+é a ocorrência ou não (1 ou 0) de doença coronária cardíaca (CHD), 
+associando-se com a idade (AGE) dos indivíduos, criando assim 
+um modelo de regressão logística.
+    
+  
+  **Limpar o R**
+```{r, warning = FALSE, message = FALSE}
+rm(list=ls())
+```
+  
+  
+  **Instalar os pacotes caso ainda não tenha instalado** tirar o # da frente de install.packages para funcionar
+```{r, warning = FALSE, message = FALSE}
+#Instalando pacotes
+#install.packages(c("ggplot2","readr","mfx","caret","pRoc", "ResourceSelection","modEvA","foreign","stargazer", "DataExplorer", "yardstick"))
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+#Carregando pacotes exigidos:
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(mfx)
+library(caret)
+library(pROC)
+library(ResourceSelection)
+library(modEvA)
+library(foreign)
+library(stargazer)
+library(DataExplorer)
+library(yardstick)
+library(kableExtra)
+```
+    
+    
+**Ler os dados** disponíveis na internet
+```{r, warning = FALSE, message = FALSE}
+chd <- read_delim("https://github.com/Smolski/livroavancado/raw/master/cdh.csv", 
+                  ";", escape_double = FALSE, col_types = cols(CHD = col_factor(levels = c())), 
+                  trim_ws = TRUE)
+```
+  
+  
+**Visualizar os dados**
+```{r, warning = FALSE, message = FALSE}
+kable(head(chd, 10)) %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+summary(chd)
+```
+
+```{r, warning = FALSE, message = FALSE}
+str(chd)
+```
+
+```{r, warning = FALSE, message = FALSE}
+glimpse(chd)
+```
+  
+  
+**Mostrar o gráfico de dispersão das observações** Eixo x é idade e eixo y é possui ou não a doença CHD (1 possui e 0 não possui)
+```{r, warning = FALSE, message = FALSE}
+ggplot(chd, aes(x=AGE, y=CHD)) + 
+  geom_point() + 
+  stat_smooth(method="glm", method.args=list(family="binomial"), se=FALSE)
+
+
+m1=glm(CHD~AGE, family = binomial(link="logit"), data = chd)
+summary(m1)
+```
+Se observa o intercepto com o valor de -5,309, sendo que para a análise 
+aqui proposta da relação entre CHD e AGE não obtém-se um 
+significado prático para este resultado.No entanto, a 
+variável de interesse é idade, que no modelo de regressão 
+obteve o coeficiente de 0,1109. Pelo fato de ser positivo 
+informa que quando a idade (AGE) se eleva, elevam-se as chances 
+de ocorrência de CHD.De igual forma, nota-se que há significância 
+estatística a p = 0,001 na utilização da variável AGE para o modelo,
+mostrando que possui importância ao modelo de regressão proposto.
+  
+Por fim, o modelo é utilizado para construção da predição 
+de todos os valores das idades de todos os indivíduos desta 
+amostra.   Para isto, será criada um novo objeto contendo somente 
+a variável dependente do modelo (AGE) e em seguida, é criada nova 
+coluna constando os valores preditos.   Assim, pode ser plotado um 
+gráfico completo com todas as probabilidades desta base de dados:
+
+```{r, warning = FALSE, message = FALSE}
+# Filtrando a idade dos indivíduos
+IDADE<-chd[,1]
+```
+
+```{r, warning = FALSE, message = FALSE}
+# Criando campo de predição para cada idade dos indivíduos 
+chd$PRED=predict(m1, newdata=IDADE, type="response")
+```
+  
+  
+**Plotando a probabilidade predita pelo modelo**
+```{r, warning = FALSE, message = FALSE}
+ggplot(chd, aes(x=AGE, y=PRED)) + 
+  geom_point()
+```
+  
+  
+**Estimando a Razão de Chances**
+```{r, warning = FALSE, message = FALSE}
+logitor(CHD~AGE,data = chd)
+```
+O modelo de regressão logística, porém, traz os resultados dos 
+estimadores na forma logarítma, ou seja, o log das chances da 
+variável idade no modelo é 0,1109. No entanto, para uma interpretação 
+mais enriquecida da relação da idade com o CHD é necessária a 
+transformação deste coeficiente, ou seja, que seja efetuada a 
+exponenciação da(s) variavel(eis) da regressão. Assim, obtém-se 
+a razão das chances (OR - Odds Ratio em inglês) para as variáveis 
+independentes.
+  
+Uma maneira prática de se obter a razão de chances no RStudio 
+é utilizando o pacote mfx. Novamente o intercepto não nos interessa
+nesta análise mas sim a variável AGE. Como demonstrado abaixo, 
+o resultado da razão de chances da variável AGE foi de 1,1173, 
+o que pode assim ser interpretado: para cada variação unitária 
+na idade (AGE), as chances de ocorrência de CHD aumentam 1,1173 
+vezes. Dito de outra forma, para cada variação unitária em AGE, 
+aumentam-se 11,73% ((1,1173-1)*100) as chances da ocorrência de CHD.
+  
+    
+**Determinando o Intervalo de Confiança**
+```{r, warning = FALSE, message = FALSE}
+exp(cbind(OR=coef(m1), confint(m1)))
+```
+
+A determinação do intervalo de confiança do modelo proposto
+é relevante para que seja analizada a estimativa do intervalo 
+de predição do coeficiente da variável independente, a um nível 
+de confiança de 95%. Desta forma, em 95% dos casos, o parâmetro 
+dos coeficientes estará dentro deste intervalo.
+  
+De forma prática é possível determinar os intervalos de confiança 
+com o comando confint() commo observado abaixo, sendo que o 
+coeficiente AGE toma o valor de 1,1173, podendo variar de 
+1,0692 a 1,1758.
+  
+      
+**Predição de Probabilidades**
+```{r, warning = FALSE, message = FALSE}
+media = data.frame(AGE=mean(chd$AGE))
+media
+```
+
+A partir dos coeficientes do modelo de regressão logística é possível, 
+portanto, efetuar a predição da variável categórica CHD, ou seja, 
+saber a chance de ocorrer CHD com relação à uma determinada idade (AGE). 
+No exemplo abaixo, primeiramente utilizamos a idade média das 
+observações (44,38 anos), criando assim um novo data.frame chamado 
+media.
+
+```{r, warning = FALSE, message = FALSE}
+media$pred.prob = predict(m1, newdata=media, type="response")
+media
+```
+
+Para utilizar o valor da idade média na função de regressão 
+obtida (m1), utiliza-se a função predict(), de acordo com valor 
+da média encontrada (data.frame media). 
+  
+O resultado mostra que para 
+a idade média da amostra, 44,38 anos, há uma probabilidade 
+de 40,44% na ocorrência da doença CHD. Esta ferramenta permite 
+também a comparação pelo pesquisador das diferentes probabilidades 
+entre as diversas idades (variável AGE).
+  
+    
+**Matriz de Confusão**
+```{r, warning = FALSE, message = FALSE}
+chd$pdata <- as.factor(
+  ifelse(
+    predict(m1, 
+            newdata = chd, 
+            type = "response")
+    >0.5,"1","0"))
+
+caret::confusionMatrix(chd$pdata, chd$CHD, positive="1")
+```
+
+A matriz de confusão retoma uma excelente acurácia total do 
+modelo em 74%, sendo que o modelo consegue acertos de 70,7% 
+na predição de valores positivos ou dos “eventos” (29/41) e 
+76,3% na predição de valores negativos ou os “não eventos” (45/59).
+  
+    
+**Curva ROC**
+```{r, warning = FALSE, message = FALSE}
+roc1=plot.roc(chd$CHD,fitted(m1))
+
+plot(roc1,
+     print.auc=TRUE, 
+     auc.polygon=TRUE, 
+     grud=c(0.1,0.2),
+     grid.col=c("green","red"), 
+     max.auc.polygon=TRUE, 
+     auc.polygon.col="lightgreen", 
+     print.thres=TRUE)
+```
+  
+  
+**O teste Hosmer e Lemeshow**
+
+```{r, warning = FALSE, message = FALSE}
+hl=hoslem.test(chd$CHD,fitted(m1),g=10)
+hl
+```
+
+O teste de Hosmer e Lemeshow é utilizado para demonstrar a 
+qualidade do ajuste do modelo, ou seja, se o modelo pode explicar 
+os dados observados. 
+Para este teste, os dados são divididos de 
+acordo com as probabilidades previstas em 10 grupos iguais, sendo 
+que os números previstos e os reais são comparados com a estatística 
+do qui-quadrado. Hair et al. (2009) sugerem um tamanho de amostra de 
+pelo menos 50 casos para a realização deste teste.
+  
+A hipótese nula H0 do qui-quadrado (p=0,05) deste teste é a de que
+as proporções observadas e esperadas são as mesmas ao longo da amostra. 
+O modelo apresenta dificuldade de ajuste em função de que rejeita 
+a hipótese nula a p=0,05.
+  
+Um grande valor de qui-quadrado (com pequeno valor de p < 0,05) 
+indica um ajuste ruim e pequenos valores de qui-quadrado 
+(com maior valor de p próximo a 1) indicam um bom ajuste 
+do modelo de regressão logística.
+   
+      
+**Pseudo R2**
+
+```{r, warning = FALSE, message = FALSE}
+RsqGLM(m1)
+```
+
+Semelhante ao coeficiente de determinação R2 da regressão múltipla, 
+a medida de pseudo R2 representam o ajuste geral do modelo proposto.
+Sua interpretação, portanto, é semelhante à regressão múltipla.
+  
+O modelo CoxSnell, por exemplo,explica 25% da variação na 
+variável dependente. No entanto, é chamado de pseudo 
+porque não é exatamente o R2 da regressão linear.
+
